@@ -22,8 +22,8 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/yourrepo.git
-   cd yourrepo
+   git clone https://github.com/FrodoCompacto/audio-quality-checker
+   cd audio-quality-checker
    ```
 
 2. **Install the requirements**:
