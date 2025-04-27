@@ -1,0 +1,15 @@
+[2025-04-27 04:23:16] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\01 - The Bridge (Late Night Grand River Mix).flac: 
+[2025-04-27 04:23:36] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\05. The Power (KAF3R Remix) [Mixed].m4a: 
+[2025-04-27 04:23:36] Duration error C:/Users/jvfag/Documents/Soulseek Downloads/complete\05. The Power (KAF3R Remix) [Mixed].m4a: 
+[2025-04-27 04:24:02] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\154. DMNDS - SexyBack (Extended).mp3: 
+[2025-04-27 04:26:47] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\HANS - Kid Cudi - Day N' Nite (Adam Sellouk & Konstantin Sibold Remix) [UNRELEASED] FULL QUALITY.m4a: 
+[2025-04-27 04:26:47] Duration error C:/Users/jvfag/Documents/Soulseek Downloads/complete\HANS - Kid Cudi - Day N' Nite (Adam Sellouk & Konstantin Sibold Remix) [UNRELEASED] FULL QUALITY.m4a: 
+[2025-04-27 04:26:48] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\Helen&boys - Om (Original Mix).mp3: 
+[2025-04-27 04:26:57] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\Innellea, CamelPhat, Monolink - Shelter (Extended Mix).mp3: 
+[2025-04-27 04:28:08] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\NA - Max Styler & Oscar L - Addiction (Edit).m4a: 
+[2025-04-27 04:28:08] Duration error C:/Users/jvfag/Documents/Soulseek Downloads/complete\NA - Max Styler & Oscar L - Addiction (Edit).m4a: 
+[2025-04-27 04:29:51] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\Tom Demac - Sink Or Swim.mp3: 
+[2025-04-27 04:29:59] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\Wonderful World enoo Napa Remix- Kaudron.m4a: 
+[2025-04-27 04:29:59] Duration error C:/Users/jvfag/Documents/Soulseek Downloads/complete\Wonderful World enoo Napa Remix- Kaudron.m4a: 
+[2025-04-27 04:30:15] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\filtergrinder\2017.04 - Beatport Top 100 Downloads April 2017 [EDM RG]\Kora (CA) - Caddo (Original Mix).mp3: 
+[2025-04-27 04:33:03] Audio load error C:/Users/jvfag/Documents/Soulseek Downloads/complete\Musicmaster2023\Melodic House & Techno - 0203-24\La Giang - Rumble in the Jungle (Original Mix).mp3: 
