@@ -1,3 +1,8 @@
+[![Python 3.6+](https://img.shields.io/badge/Python-3.6%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Work in Progress](https://img.shields.io/badge/Status-Work%20in%20Progress-orange)]()
+[![Requirements](https://img.shields.io/badge/dependencies-low-lightgrey.svg)](requirements.txt)
+[![Last Commit](https://img.shields.io/github/last-commit/FrodoCompacto/audio-quality-checker.svg)](https://github.com/FrodoCompacto/audio-quality-checker/commits/main)
 
 # Audio Frequency Analyzer for DJs
 
@@ -59,7 +64,7 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
 
 ## ⚙️ Requirements
 
-- **Python 3.8+**
+- **Python 3.6+**
 - Libraries:
   - `librosa`
   - `numpy`
