@@ -17,12 +17,12 @@ ENV/
 env.bak/
 venv.bak/
 
-# Arquivos gerados pelo script
+# Generated files
 audio_analysis.xlsx
 program.log
 processed_state.json
 
-# Pasta do FFmpeg standalone
+# FFmpeg standalone
 ffmpeg/
 
 # MacOS
@@ -31,8 +31,8 @@ ffmpeg/
 # Windows
 Thumbs.db
 
-# Logs temporários
+# Logs
 *.log
 
-# Excel temporários (caso crie backups automaticamente)
+# Excel temp
 ~$audio_analysis.xlsx

@@ -41,9 +41,9 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
    python analyze.py
    ```
 
-5. **Select your music folder** when prompted.
+4. **Select your music folder** when prompted.
 
-6. **Check the results**:
+5. **Check the results**:
    - `audio_analysis.xlsx` will be created/updated.
    - `program.log` will list any issues encountered.
 

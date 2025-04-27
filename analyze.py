@@ -20,13 +20,12 @@ LOCAL_FFMPEG = os.path.join(SCRIPT_DIR, 'ffmpeg', 'bin')
 if os.path.isdir(LOCAL_FFMPEG):
     os.environ['PATH'] = LOCAL_FFMPEG + os.pathsep + os.environ.get('PATH', '')
 
-# Verifica backend do FFmpeg
+# Check for FFmpeg backend
 import shutil
 if not shutil.which('ffmpeg'):
-    # Informar apenas no console, sem interromper; audioread pode falhar depois
-    print("[WARNING] FFmpeg não encontrado no PATH. Para melhor compatibilidade com MP3/M4A, coloque um build standalone em './ffmpeg/bin' ou instale FFmpeg globalmente.")
+    print("[WARNING] FFmpeg not found in PATH. For MP3/M4A support, install FFmpeg or place a standalone build in './ffmpeg/bin'.")
 
-# Configurações
+# Configurations
 SUPPORTED_EXTENSIONS = ('.flac', '.aiff', '.aif', '.m4a', '.mp3', '.wav')
 THRESH_DB = -60
 PROPORTION_THRESHOLD = 0.05
@@ -42,7 +41,7 @@ WEIGHTS = {
     'bitdepth': 10
 }
 
-# Configurar logging
+# Setup logging
 logging.basicConfig(
     filename=LOG_FILE,
     level=logging.DEBUG,
@@ -50,7 +49,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-# ... rest of code unchanged ...
 
 def load_state(path):
     if os.path.exists(path):
@@ -58,7 +56,7 @@ def load_state(path):
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception:
-            logger.exception(f"Erro ao carregar estado de {path}")
+            logger.exception(f"Error loading state from {path}")
             return {}
     return {}
 
@@ -67,9 +65,9 @@ def save_state(path, state):
     try:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(state, f, indent=2, ensure_ascii=False)
-        logger.info(f"Estado salvo em {path}")
+        logger.info(f"State saved to {path}")
     except Exception:
-        logger.exception(f"Erro ao salvar estado em {path}")
+        logger.exception(f"Error saving state to {path}")
 
 
 def file_hash(path, block_size=65536):
@@ -97,7 +95,7 @@ def max_reliable_frequency(path):
         max_freq = float(freqs[valid_bins[-1]]) if valid_bins.size else 0.0
         return max_freq, sr
     except Exception:
-        logger.exception(f"Erro ao analisar frequência para {path}")
+        logger.exception(f"Error analyzing frequency for {path}")
         return None, None
 
 
@@ -115,11 +113,21 @@ def extract_metadata(filepath):
 
 
 def compute_rating(freq, sr, bitrate, bitdepth):
+    # Partial scores
     freq_score = min(freq / 20000.0, 1.0) * WEIGHTS['freq']
-    br_score = min(bitrate / 320000.0, 1.0) * WEIGHTS['bitrate'] if bitrate else 0
-    sr_score = min(sr / 48000.0, 1.0) * WEIGHTS['samplerate'] if sr else 0
-    bd_score = min(bitdepth / 24.0, 1.0) * WEIGHTS['bitdepth'] if bitdepth else 0
-    return round(freq_score + br_score + sr_score + bd_score, 1)
+    br_score   = min(bitrate / 320000.0, 1.0) * WEIGHTS['bitrate'] if bitrate else 0
+    sr_score   = min(sr / 48000.0, 1.0) * WEIGHTS['samplerate'] if sr else 0
+    bd_score   = 0
+    # Sum active weights
+    active_weights = WEIGHTS['freq'] + WEIGHTS['bitrate'] + WEIGHTS['samplerate']
+    if bitdepth:
+        bd_score = min(bitdepth / 24.0, 1.0) * WEIGHTS['bitdepth']
+        active_weights += WEIGHTS['bitdepth']
+    # Raw sum
+    raw = freq_score + br_score + sr_score + bd_score
+    # Normalize to 0-100 scale
+    normalized = (raw / active_weights) * 100
+    return round(normalized, 1)
 
 
 def write_excel(state):
@@ -144,7 +152,7 @@ def write_excel(state):
             e['rating']
         ])
 
-    # Formatação
+    # Formatting
     for cell in ws[1]:
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal='center')
@@ -152,7 +160,7 @@ def write_excel(state):
         length = max(len(str(c.value)) for c in col)
         ws.column_dimensions[col[0].column_letter].width = length + 2
 
-    # Formatação condicional
+    # Conditional formatting
     rating_col = 'H'
     ws.conditional_formatting.add(
         f"{rating_col}2:{rating_col}{ws.max_row}",
@@ -168,13 +176,12 @@ def write_excel(state):
             CellIsRule(operator='equal', formula=['"ERROR"'], fill=error_fill)
         )
 
-    # Tentar salvar o Excel
     try:
         wb.save(EXCEL_FILE)
-        logger.info(f"Excel salvo: {EXCEL_FILE}")
+        logger.info(f"Excel saved: {EXCEL_FILE}")
         return True
     except Exception:
-        logger.exception(f"Falha ao salvar Excel: {EXCEL_FILE}")
+        logger.exception(f"Failed to save Excel: {EXCEL_FILE}")
         return False
 
 
@@ -231,16 +238,14 @@ def scan_and_update(root_dir):
         print(f"[{count}/{total}] Analyzed: {filepath} → {freq or 'ERROR'} Hz, Rating: {rating}%")
 
     if updated:
-        # Tentar escrever o Excel antes de salvar estado
         if write_excel(state):
             save_state(STATE_FILE, state)
             messagebox.showinfo('Done', 'Analysis and report generated successfully.')
         else:
             messagebox.showerror(
                 'Error',
-                'Failed to save Excel report. This probably happened because the Excel report is open.\n'
-                'Please close the file or any software using it and try again.\n'
-                'If the problem persists, check the log file at program.log.'
+                'Failed to save Excel report. Please close any open instances of the file and try again.\n'
+                'Check the log file for details.'
             )
     else:
         print("No new or updated tracks found.")
