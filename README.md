@@ -8,7 +8,7 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
 
 - Analyze **FLAC**, **AIFF**, **WAV**, **MP3**, and **M4A** files.
 - Scans folders **recursively** (including subfolders).
-- **Avoids reprocessing** files already analyzed using a file **hash** (not just the name).
+- **Avoids reprocessing** files already analyzed using a file **hash**.
 - **Detects** maximum reliable frequency, bitrate, sample rate, bit depth, and duration.
 - **Calculates a quality rating (0 to 100%)** based on technical parameters.
 - **Generates a formatted Excel file** (`audio_analysis.xlsx`) with:
@@ -32,21 +32,25 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
    ```
 
 3. **Run the application**:
+
+   If your .py files are properly associated with Python, you can simply double-click on the script file (analyze.py) to run it. The program will execute and prompt you to select the folder for analysis.
+
+    For more control or if you encounter any issues, you can also run the script via the command line:
    ```bash
-   python src/analyze.py
+   python analyze.py
    ```
 
-4. **Select your music folder** when prompted.
+5. **Select your music folder** when prompted.
 
-5. **Check the results**:
+6. **Check the results**:
    - `audio_analysis.xlsx` will be created/updated.
    - `errors.txt` will list any issues encountered.
 
 ---
 
-## 📆 File Outputs
+## 📁 File Outputs
 
-- **audio_analysis.xlsx**: Detailed report with color-coded ratings.
+- **audio_analysis.xlsx**: Detailed report.
 - **errors.txt**: Log file with errors and problematic tracks.
 - **processed_state.json**: Internal tracking to skip already analyzed files.
 
@@ -84,7 +88,7 @@ Note: These are just guidelines. Audio quality can be subjective depending on th
 
 ---
 
-## 👓 How to Customize the Output
+## ☝️🤓 How to Customize the Output
 
 Inside `analyze.py`, you can configure these parameters to fit your needs:
 
