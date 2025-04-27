@@ -1,3 +1,4 @@
+
 # Audio Frequency Analyzer for DJs
 
 Analyze and validate the quality of your audio files in bulk, ensuring your music is ready for professional DJ performances.
@@ -14,7 +15,7 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
 - **Generates a formatted Excel file** (`audio_analysis.xlsx`) with:
   - Conditional coloring: Green for high-quality tracks, Red for low-quality.
   - Highlights errors automatically.
-- **Logs errors** separately in `errors.txt` for easy review.
+- **Logs** in `program.log` for easy review.
 
 ---
 
@@ -33,7 +34,7 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
 
 3. **Run the application**:
 
-   If your .py files are properly associated with Python, you can simply double-click on the script file (analyze.py) to run it. The program will execute and prompt you to select the folder for analysis.
+   If your .py files are properly associated with Python, you can simply double-click on the script file (`analyze.py`) to run it. The program will execute and prompt you to select the folder for analysis.
 
     For more control or if you encounter any issues, you can also run the script via the command line:
    ```bash
@@ -44,14 +45,14 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
 
 6. **Check the results**:
    - `audio_analysis.xlsx` will be created/updated.
-   - `errors.txt` will list any issues encountered.
+   - `program.log` will list any issues encountered.
 
 ---
 
 ## 📁 File Outputs
 
 - **audio_analysis.xlsx**: Detailed report.
-- **errors.txt**: Log file with errors and problematic tracks.
+- **program.log**: Log file with errors and other data.
 - **processed_state.json**: Internal tracking to skip already analyzed files.
 
 ---
@@ -65,6 +66,58 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
   - `mutagen`
   - `openpyxl`
   - `tkinter` (comes with Python standard on most systems)
+
+---
+
+## 🔧 FFmpeg (Optional but Recommended)
+
+This application can run **without FFmpeg**, but using FFmpeg will help avoid errors when processing some tracks, especially for formats like **MP3** and **M4A**. FFmpeg improves compatibility and provides better audio handling.
+
+If you want to use FFmpeg with this tool, follow the instructions below:
+
+### Windows:
+1. **Download FFmpeg**:
+   - Visit [gyan.dev official website](https://www.gyan.dev/ffmpeg/builds/) and download the **ffmpeg-git-essentials.7z**.
+   - Extract the archive and copy the `bin` folder to your project directory, i.e., `./ffmpeg/bin`.
+    - **Example folder structure**:
+```
+/audio-quality-checker
+├── analyze.py
+├── requirements.txt
+├── audio_analysis.xlsx
+├── program.log
+├── processed_state.json
+└── ffmpeg
+    └── bin
+        ├── ffmpeg.exe
+        ├── ffprop.exe
+        └── other-ffmpeg-files
+```
+
+2. **Add FFmpeg to PATH (optional)**:
+   - You can also add the FFmpeg folder to your system's PATH environment variable for global usage. In this case the program will recognize ffmpeg automatically, and it will not be necessary to install the standalone version in the project root.
+
+### Linux:
+1. **Install FFmpeg**:
+   - On **Ubuntu/Debian** systems:
+     ```bash
+     sudo apt update
+     sudo apt install ffmpeg
+     ```
+   - On **Fedora** systems:
+     ```bash
+     sudo dnf install ffmpeg
+     ```
+   - On **Arch Linux**:
+     ```bash
+     sudo pacman -S ffmpeg
+     ```
+
+2. **Using FFmpeg Standalone (optional)**:
+   - If you want to use a local FFmpeg build, download the static build from [FFmpeg.org](https://ffmpeg.org/download.html).
+   - Extract the `ffmpeg` folder to your project directory (e.g., `./ffmpeg/bin`).
+
+Once FFmpeg is installed or included, the tool will automatically use it for better audio handling.
 
 ---
 
@@ -120,9 +173,9 @@ EXCEL_FILE = 'audio_analysis.xlsx'
 - Name of the generated Excel file containing the analysis results.
 
 ```python
-ERROR_LOG_FILE = 'errors.txt'
+LOG_FILE = 'program.log'
 ```
-- Name of the file where any errors during analysis will be recorded.
+- Name of the file where the logs generated during analysis will be recorded.
 
 ```python
 WEIGHTS = {
@@ -146,4 +199,3 @@ This project is licensed under the **MIT License** — feel free to use, share, 
 
 - Only **new or changed** tracks are processed — saving time for large collections.
 - Very useful for DJs ensuring **audio quality control** before gigs.
-
