@@ -54,29 +54,12 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
 
 ---
 
-## 📁 File Outputs
+## 🔧 FFmpeg (Required for Full Compatibility)
 
-- **audio_analysis.xlsx**: Detailed report.
-- **program.log**: Log file with errors and other data.
-- **processed_state.json**: Internal tracking to skip already analyzed files.
+This application **can start without FFmpeg**, but **many formats (especially MP3 and M4A) will not be analyzed correctly** without it.  
+Without FFmpeg, **errors are guaranteed to occur** when processing some audio files — especially when reading duration, spectrum, or metadata.
 
----
-
-## ⚙️ Requirements
-
-- **Python 3.6+**
-- Libraries:
-  - `librosa`
-  - `numpy`
-  - `mutagen`
-  - `openpyxl`
-  - `tkinter` (comes with Python standard on most systems)
-
----
-
-## 🔧 FFmpeg (Optional but Recommended)
-
-This application can run **without FFmpeg**, but using FFmpeg will help avoid errors when processing some tracks, especially for formats like **MP3** and **M4A**. FFmpeg improves compatibility and provides better audio handling.
+**It is highly recommended to install or include FFmpeg** to ensure reliable and complete analysis.
 
 If you want to use FFmpeg with this tool, follow the instructions below:
 
@@ -123,6 +106,26 @@ If you want to use FFmpeg with this tool, follow the instructions below:
    - Extract the `ffmpeg` folder to your project directory (e.g., `./ffmpeg/bin`).
 
 Once FFmpeg is installed or included, the tool will automatically use it for better audio handling.
+
+---
+
+## 📁 File Outputs
+
+- **audio_analysis.xlsx**: Detailed report.
+- **program.log**: Log file with errors and other data.
+- **processed_state.json**: Internal tracking to skip already analyzed files.
+
+---
+
+## ⚙️ Requirements
+
+- **Python 3.6+**
+- Libraries:
+  - `librosa`
+  - `numpy`
+  - `mutagen`
+  - `openpyxl`
+  - `tkinter` (comes with Python standard on most systems)
 
 ---
 
