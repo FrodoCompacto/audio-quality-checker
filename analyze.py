@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import hashlib
 import librosa
@@ -10,14 +11,28 @@ from mutagen import File as MutagenFile
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.formatting.rule import ColorScaleRule, CellIsRule
+import logging
+import traceback
 
+# Attempt to include local FFmpeg (portable standalone) if present
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCAL_FFMPEG = os.path.join(SCRIPT_DIR, 'ffmpeg', 'bin')
+if os.path.isdir(LOCAL_FFMPEG):
+    os.environ['PATH'] = LOCAL_FFMPEG + os.pathsep + os.environ.get('PATH', '')
+
+# Check for FFmpeg backend
+import shutil
+if not shutil.which('ffmpeg'):
+    print("[WARNING] FFmpeg not found in PATH. For MP3/M4A support, install FFmpeg or place a standalone build in './ffmpeg/bin'.")
+
+# Configurations
 SUPPORTED_EXTENSIONS = ('.flac', '.aiff', '.aif', '.m4a', '.mp3', '.wav')
 THRESH_DB = -60
 PROPORTION_THRESHOLD = 0.05
 N_FFT = 4096
 STATE_FILE = 'processed_state.json'
 EXCEL_FILE = 'audio_analysis.xlsx'
-ERROR_LOG_FILE = 'errors.txt'
+LOG_FILE = 'program.log'
 
 WEIGHTS = {
     'freq': 40,
@@ -26,10 +41,14 @@ WEIGHTS = {
     'bitdepth': 10
 }
 
-def log_error(message):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    with open(ERROR_LOG_FILE, 'a', encoding='utf-8') as f:
-        f.write(f"[{timestamp}] {message}\n")
+# Setup logging
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.DEBUG,
+    format='%(asctime)s %(levelname)s: %(message)s'
+)
+logger = logging.getLogger()
+
 
 def load_state(path):
     if os.path.exists(path):
@@ -37,12 +56,19 @@ def load_state(path):
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception:
+            logger.exception(f"Error loading state from {path}")
             return {}
     return {}
 
+
 def save_state(path, state):
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(state, f, indent=2, ensure_ascii=False)
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(state, f, indent=2, ensure_ascii=False)
+        logger.info(f"State saved to {path}")
+    except Exception:
+        logger.exception(f"Error saving state to {path}")
+
 
 def file_hash(path, block_size=65536):
     hasher = hashlib.md5()
@@ -52,32 +78,26 @@ def file_hash(path, block_size=65536):
             while buf:
                 hasher.update(buf)
                 buf = f.read(block_size)
-    except Exception as e:
-        log_error(f"Hash generation error for {path}: {e}")
+    except Exception:
+        logger.exception(f"Hash generation error for {path}")
         return None
     return hasher.hexdigest()
 
-def max_reliable_frequency(path, thresh_db=THRESH_DB, prop_thresh=PROPORTION_THRESHOLD):
+
+def max_reliable_frequency(path):
     try:
         y, sr = librosa.load(path, sr=None, mono=True)
-    except Exception as e:
-        log_error(f"Audio load error {path}: {e}")
+        S = np.abs(librosa.stft(y, n_fft=N_FFT))
+        freqs = librosa.fft_frequencies(sr=sr, n_fft=N_FFT)
+        mags_db = librosa.amplitude_to_db(S, ref=np.max)
+        presence = (mags_db > THRESH_DB).mean(axis=1)
+        valid_bins = np.where(presence >= PROPORTION_THRESHOLD)[0]
+        max_freq = float(freqs[valid_bins[-1]]) if valid_bins.size else 0.0
+        return max_freq, sr
+    except Exception:
+        logger.exception(f"Error analyzing frequency for {path}")
         return None, None
-    S = np.abs(librosa.stft(y, n_fft=N_FFT))
-    freqs = librosa.fft_frequencies(sr=sr, n_fft=N_FFT)
-    mags_db = librosa.amplitude_to_db(S, ref=np.max)
-    presence = (mags_db > thresh_db).mean(axis=1)
-    valid_bins = np.where(presence >= prop_thresh)[0]
-    max_freq = float(freqs[valid_bins[-1]]) if valid_bins.size else 0.0
-    return max_freq, sr
 
-def compute_rating(freq, sr, bitrate, bitdepth):
-    freq_score = min(freq / 20000.0, 1.0) * WEIGHTS['freq']
-    br_score = min(bitrate / 320000.0, 1.0) * WEIGHTS['bitrate'] if bitrate else 0
-    sr_score = min(sr / 48000.0, 1.0) * WEIGHTS['samplerate'] if sr else 0
-    bd_score = min(bitdepth / 24.0, 1.0) * WEIGHTS['bitdepth'] if bitdepth else 0
-    total = freq_score + br_score + sr_score + bd_score
-    return round(total, 1)
 
 def extract_metadata(filepath):
     try:
@@ -87,71 +107,28 @@ def extract_metadata(filepath):
         samplerate = getattr(info, 'sample_rate', None)
         bitdepth = getattr(info, 'bits_per_sample', None)
         return bitrate, samplerate, bitdepth
-    except Exception as e:
-        log_error(f"Metadata extraction error {filepath}: {e}")
+    except Exception:
+        logger.exception(f"Metadata extraction error for {filepath}")
         return None, None, None
 
-def scan_and_update(root_dir):
-    state = load_state(STATE_FILE)
-    updated = False
 
-    files = [os.path.join(dp, f) for dp, _, files in os.walk(root_dir) for f in files
-             if f.lower().endswith(SUPPORTED_EXTENSIONS)]
-    total = len(files)
-    count = 0
+def compute_rating(freq, sr, bitrate, bitdepth):
+    # Partial scores
+    freq_score = min(freq / 20000.0, 1.0) * WEIGHTS['freq']
+    br_score   = min(bitrate / 320000.0, 1.0) * WEIGHTS['bitrate'] if bitrate else 0
+    sr_score   = min(sr / 48000.0, 1.0) * WEIGHTS['samplerate'] if sr else 0
+    bd_score   = 0
+    # Sum active weights
+    active_weights = WEIGHTS['freq'] + WEIGHTS['bitrate'] + WEIGHTS['samplerate']
+    if bitdepth:
+        bd_score = min(bitdepth / 24.0, 1.0) * WEIGHTS['bitdepth']
+        active_weights += WEIGHTS['bitdepth']
+    # Raw sum
+    raw = freq_score + br_score + sr_score + bd_score
+    # Normalize to 0-100 scale
+    normalized = (raw / active_weights) * 100
+    return round(normalized, 1)
 
-    for filepath in files:
-        count += 1
-        try:
-            stat = os.stat(filepath)
-        except Exception as e:
-            log_error(f"Access error {filepath}: {e}")
-            print(f"[{count}/{total}] Access error: {filepath}")
-            continue
-
-        h = file_hash(filepath)
-        if not h:
-            print(f"[{count}/{total}] Hash error: {filepath}")
-            continue
-
-        mtime = stat.st_mtime
-        size = stat.st_size
-        entry = state.get(h)
-        if entry and entry.get('mtime') == mtime and entry.get('size') == size:
-            print(f"[{count}/{total}] Already analyzed: {filepath}")
-            continue
-
-        freq, sr = max_reliable_frequency(filepath)
-        bitrate, samplerate_meta, bitdepth = extract_metadata(filepath)
-
-        try:
-            duration = librosa.get_duration(filename=filepath)
-        except Exception as e:
-            log_error(f"Duration error {filepath}: {e}")
-            duration = None
-
-        rating = compute_rating(freq or 0, sr or 0, bitrate, bitdepth)
-
-        entry_data = {
-            'path': filepath,
-            'mtime': mtime,
-            'size': size,
-            'duration': duration if duration is not None else 'ERROR',
-            'freq': freq if freq is not None else 'ERROR',
-            'bitrate': bitrate or 'N/A',
-            'samplerate': samplerate_meta or 'N/A',
-            'bitdepth': bitdepth or 'N/A',
-            'rating': rating
-        }
-        state[h] = entry_data
-        updated = True
-        print(f"[{count}/{total}] Analyzed: {filepath} → {freq if freq else 'ERROR'} Hz, Rating: {rating}%")
-
-    if updated:
-        save_state(STATE_FILE, state)
-        write_excel(state)
-    else:
-        print("No new or updated tracks found.")
 
 def write_excel(state):
     wb = Workbook()
@@ -165,19 +142,25 @@ def write_excel(state):
     for e in state.values():
         filename = os.path.basename(e['path'])
         ws.append([
-            filename, e['size'], round(e['duration'], 2) if isinstance(e['duration'], float) else e['duration'],
-            e['freq'], e['bitrate'], e['samplerate'], e['bitdepth'], e['rating']
+            filename,
+            e['size'],
+            round(e['duration'], 2) if isinstance(e['duration'], float) else e['duration'],
+            e['freq'],
+            e['bitrate'],
+            e['samplerate'],
+            e['bitdepth'],
+            e['rating']
         ])
 
-    header_font = Font(bold=True)
+    # Formatting
     for cell in ws[1]:
-        cell.font = header_font
+        cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal='center')
+    for col in ws.columns:
+        length = max(len(str(c.value)) for c in col)
+        ws.column_dimensions[col[0].column_letter].width = length + 2
 
-    for column_cells in ws.columns:
-        length = max(len(str(cell.value)) for cell in column_cells)
-        ws.column_dimensions[column_cells[0].column_letter].width = length + 2
-
+    # Conditional formatting
     rating_col = 'H'
     ws.conditional_formatting.add(
         f"{rating_col}2:{rating_col}{ws.max_row}",
@@ -193,8 +176,81 @@ def write_excel(state):
             CellIsRule(operator='equal', formula=['"ERROR"'], fill=error_fill)
         )
 
-    wb.save(EXCEL_FILE)
-    print(f"\nExcel updated: {EXCEL_FILE}")
+    try:
+        wb.save(EXCEL_FILE)
+        logger.info(f"Excel saved: {EXCEL_FILE}")
+        return True
+    except Exception:
+        logger.exception(f"Failed to save Excel: {EXCEL_FILE}")
+        return False
+
+
+def scan_and_update(root_dir):
+    state = load_state(STATE_FILE)
+    updated = False
+
+    files = [os.path.join(dp, f) for dp, _, files in os.walk(root_dir) for f in files
+             if f.lower().endswith(SUPPORTED_EXTENSIONS)]
+    total = len(files)
+    count = 0
+
+    for filepath in files:
+        count += 1
+        try:
+            stat = os.stat(filepath)
+        except Exception:
+            logger.exception(f"Access error for {filepath}")
+            print(f"[{count}/{total}] Access error: {filepath}")
+            continue
+
+        h = file_hash(filepath)
+        if not h:
+            print(f"[{count}/{total}] Hash error: {filepath}")
+            continue
+
+        mtime, size = stat.st_mtime, stat.st_size
+        entry = state.get(h)
+        if entry and entry.get('mtime') == mtime and entry.get('size') == size:
+            print(f"[{count}/{total}] Already analyzed: {filepath}")
+            continue
+
+        freq, sr = max_reliable_frequency(filepath)
+        bitrate, samplerate_meta, bitdepth = extract_metadata(filepath)
+        try:
+            duration = librosa.get_duration(filename=filepath)
+        except Exception:
+            logger.exception(f"Duration error for {filepath}")
+            duration = 'ERROR'
+
+        rating = compute_rating(freq or 0, sr or 0, bitrate, bitdepth)
+        state[h] = {
+            'path': filepath,
+            'mtime': mtime,
+            'size': size,
+            'duration': duration,
+            'freq': freq if freq is not None else 'ERROR',
+            'bitrate': bitrate or 'N/A',
+            'samplerate': samplerate_meta or 'N/A',
+            'bitdepth': bitdepth or 'N/A',
+            'rating': rating
+        }
+        updated = True
+        print(f"[{count}/{total}] Analyzed: {filepath} → {freq or 'ERROR'} Hz, Rating: {rating}%")
+
+    if updated:
+        if write_excel(state):
+            save_state(STATE_FILE, state)
+            messagebox.showinfo('Done', 'Analysis and report generated successfully.')
+        else:
+            messagebox.showerror(
+                'Error',
+                'Failed to save Excel report. Please close any open instances of the file and try again.\n'
+                'Check the log file for details.'
+            )
+    else:
+        print("No new or updated tracks found.")
+        messagebox.showinfo('Info', 'No new or updated tracks found.')
+
 
 def select_folder_and_run():
     root = tk.Tk()
@@ -204,7 +260,7 @@ def select_folder_and_run():
         messagebox.showinfo('Cancelled', 'No folder selected.')
         return
     scan_and_update(folder)
-    messagebox.showinfo('Done', 'Analysis finished.')
+
 
 if __name__ == '__main__':
     select_folder_and_run()
