@@ -13,6 +13,7 @@ from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.formatting.rule import ColorScaleRule, CellIsRule
 import logging
 import traceback
+import shutil
 
 # Attempt to include local FFmpeg (portable standalone) if present
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,7 +22,6 @@ if os.path.isdir(LOCAL_FFMPEG):
     os.environ['PATH'] = LOCAL_FFMPEG + os.pathsep + os.environ.get('PATH', '')
 
 # Check for FFmpeg backend
-import shutil
 if not shutil.which('ffmpeg'):
     print("[WARNING] FFmpeg not found in PATH. For MP3/M4A support, install FFmpeg or place a standalone build in './ffmpeg/bin'.")
 
@@ -41,14 +41,13 @@ WEIGHTS = {
     'bitdepth': 10
 }
 
-# Setup logging
+# Setup logging (only errors)
 logging.basicConfig(
     filename=LOG_FILE,
-    level=logging.DEBUG,
+    level=logging.ERROR,
     format='%(asctime)s %(levelname)s: %(message)s'
 )
 logger = logging.getLogger()
-
 
 def load_state(path):
     if os.path.exists(path):
@@ -60,15 +59,12 @@ def load_state(path):
             return {}
     return {}
 
-
 def save_state(path, state):
     try:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(state, f, indent=2, ensure_ascii=False)
-        logger.info(f"State saved to {path}")
     except Exception:
         logger.exception(f"Error saving state to {path}")
-
 
 def file_hash(path, block_size=65536):
     hasher = hashlib.md5()
@@ -82,7 +78,6 @@ def file_hash(path, block_size=65536):
         logger.exception(f"Hash generation error for {path}")
         return None
     return hasher.hexdigest()
-
 
 def max_reliable_frequency(path):
     try:
@@ -98,7 +93,6 @@ def max_reliable_frequency(path):
         logger.exception(f"Error analyzing frequency for {path}")
         return None, None
 
-
 def extract_metadata(filepath):
     try:
         f = MutagenFile(filepath)
@@ -111,30 +105,23 @@ def extract_metadata(filepath):
         logger.exception(f"Metadata extraction error for {filepath}")
         return None, None, None
 
-
 def compute_rating(freq, sr, bitrate, bitdepth):
-    # Partial scores
     freq_score = min(freq / 20000.0, 1.0) * WEIGHTS['freq']
-    br_score   = min(bitrate / 320000.0, 1.0) * WEIGHTS['bitrate'] if bitrate else 0
-    sr_score   = min(sr / 48000.0, 1.0) * WEIGHTS['samplerate'] if sr else 0
-    bd_score   = 0
-    # Sum active weights
+    br_score = min(bitrate / 320000.0, 1.0) * WEIGHTS['bitrate'] if bitrate else 0
+    sr_score = min(sr / 48000.0, 1.0) * WEIGHTS['samplerate'] if sr else 0
+    bd_score = 0
     active_weights = WEIGHTS['freq'] + WEIGHTS['bitrate'] + WEIGHTS['samplerate']
     if bitdepth:
         bd_score = min(bitdepth / 24.0, 1.0) * WEIGHTS['bitdepth']
         active_weights += WEIGHTS['bitdepth']
-    # Raw sum
     raw = freq_score + br_score + sr_score + bd_score
-    # Normalize to 0-100 scale
     normalized = (raw / active_weights) * 100
     return round(normalized, 1)
-
 
 def write_excel(state):
     wb = Workbook()
     ws = wb.active
     ws.title = "Audio Report"
-
     headers = ['file_name', 'file_size_bytes', 'duration_s', 'max_freq_hz',
                'bitrate', 'samplerate', 'bitdepth', 'rating']
     ws.append(headers)
@@ -152,7 +139,6 @@ def write_excel(state):
             e['rating']
         ])
 
-    # Formatting
     for cell in ws[1]:
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal='center')
@@ -160,7 +146,6 @@ def write_excel(state):
         length = max(len(str(c.value)) for c in col)
         ws.column_dimensions[col[0].column_letter].width = length + 2
 
-    # Conditional formatting
     rating_col = 'H'
     ws.conditional_formatting.add(
         f"{rating_col}2:{rating_col}{ws.max_row}",
@@ -178,12 +163,17 @@ def write_excel(state):
 
     try:
         wb.save(EXCEL_FILE)
-        logger.info(f"Excel saved: {EXCEL_FILE}")
         return True
     except Exception:
         logger.exception(f"Failed to save Excel: {EXCEL_FILE}")
         return False
 
+def needs_reanalysis(entry):
+    if not entry:
+        return True
+    if any(str(entry.get(k)) in ("ERROR", "N/A", "None") for k in ['freq', 'duration', 'bitrate', 'samplerate']):
+        return True
+    return False
 
 def scan_and_update(root_dir):
     state = load_state(STATE_FILE)
@@ -210,7 +200,8 @@ def scan_and_update(root_dir):
 
         mtime, size = stat.st_mtime, stat.st_size
         entry = state.get(h)
-        if entry and entry.get('mtime') == mtime and entry.get('size') == size:
+
+        if entry and entry.get('mtime') == mtime and entry.get('size') == size and not needs_reanalysis(entry):
             print(f"[{count}/{total}] Already analyzed: {filepath}")
             continue
 
@@ -251,7 +242,6 @@ def scan_and_update(root_dir):
         print("No new or updated tracks found.")
         messagebox.showinfo('Info', 'No new or updated tracks found.')
 
-
 def select_folder_and_run():
     root = tk.Tk()
     root.withdraw()
@@ -260,7 +250,6 @@ def select_folder_and_run():
         messagebox.showinfo('Cancelled', 'No folder selected.')
         return
     scan_and_update(folder)
-
 
 if __name__ == '__main__':
     select_folder_and_run()
