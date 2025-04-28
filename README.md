@@ -155,6 +155,31 @@ The rating is calculated based on technical parameters like frequency, bitrate, 
 
 ---
 
+## ☝️🤓 How to Customize the Output
+
+Inside `analyze.pyw`, you can configure these parameters to fit your needs:
+
+### Configurable Parameters
+
+```python
+# Configurations
+THRESH_DB = -60                        # Threshold in decibels. Frequencies below this value are considered too weak to be meaningful.
+PROPORTION_THRESHOLD = 0.05            # Minimum proportion (5%) of the track that must exhibit energy at a frequency to consider it valid.
+N_FFT = 4096                           # Size of the window used in the FFT (Fast Fourier Transform). Larger values provide higher frequency resolution but slower processing.
+EXCEL_FILE = 'audio_analysis.xlsx'     # Name of the generated Excel file containing the analysis results.
+
+WEIGHTS = {                            # Defines how much each factor (frequency, bitrate, sample rate, bit depth) contributes to the overall quality rating.
+    'freq': 40,
+    'bitrate': 30,
+    'samplerate': 20,
+    'bitdepth': 10
+}
+```
+
+You can adjust thresholds, parameters, and how much each factor impacts the quality rating depending on your event requirements.
+
+---
+
 ## 📄 License
 
 This project is licensed under the **MIT License** — feel free to use, share, and modify.
