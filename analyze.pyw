@@ -22,12 +22,8 @@ LOCAL_FFMPEG = os.path.join(SCRIPT_DIR, 'ffmpeg', 'bin')
 if os.path.isdir(LOCAL_FFMPEG):
     os.environ['PATH'] = LOCAL_FFMPEG + os.pathsep + os.environ.get('PATH', '')
 
-# Check for FFmpeg backend
-if not shutil.which('ffmpeg'):
-    print("[WARNING] FFmpeg not found in PATH. For MP3/M4A support, install FFmpeg or place a standalone build in './ffmpeg/bin'.")
-
 # Configurations
-SUPPORTED_EXTENSIONS = ('.flac', '.aiff', '.aif', '.m4a', '.mp3', '.wav')
+SUPPORTED_EXTENSIONS = ['.flac', '.aiff', '.aif', '.m4a', '.mp3', '.wav']
 THRESH_DB = -60
 PROPORTION_THRESHOLD = 0.05
 N_FFT = 4096
@@ -51,7 +47,6 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 # Utility functions
-
 def load_state(path):
     if os.path.exists(path):
         try:
@@ -59,7 +54,6 @@ def load_state(path):
                 return json.load(f)
         except Exception:
             logger.exception(f"Error loading state from {path}")
-            return {}
     return {}
 
 def save_state(path, state):
@@ -119,8 +113,7 @@ def compute_rating(freq, sr, bitrate, bitdepth):
         bd_score = min(bitdepth / 24.0, 1.0) * WEIGHTS['bitdepth']
         active_weights += WEIGHTS['bitdepth']
     raw = freq_score + br_score + sr_score + bd_score
-    normalized = (raw / active_weights) * 100
-    return round(normalized, 1)
+    return round(raw / active_weights * 100, 1)
 
 def needs_reanalysis(entry):
     if not entry:
@@ -130,7 +123,6 @@ def needs_reanalysis(entry):
     return False
 
 # Excel writer
-
 def write_excel(state):
     wb = Workbook()
     ws = wb.active
@@ -139,9 +131,8 @@ def write_excel(state):
                'bitrate', 'samplerate', 'bitdepth', 'rating']
     ws.append(headers)
     for e in state.values():
-        filename = os.path.basename(e['path'])
         ws.append([
-            filename,
+            os.path.basename(e['path']),
             e['size'],
             round(e['duration'], 2) if isinstance(e['duration'], float) else e['duration'],
             e['freq'],
@@ -150,25 +141,28 @@ def write_excel(state):
             e['bitdepth'],
             e['rating']
         ])
+    # styling headers
     for cell in ws[1]:
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal='center')
+    # auto-fit columns
     for col in ws.columns:
-        length = max(len(str(c.value)) for c in col)
-        ws.column_dimensions[col[0].column_letter].width = length + 2
-    rating_col = 'H'
+        max_len = max(len(str(c.value)) for c in col)
+        ws.column_dimensions[col[0].column_letter].width = max_len + 2
+    # conditional formatting
     ws.conditional_formatting.add(
-        f"{rating_col}2:{rating_col}{ws.max_row}",
+        f"H2:H{ws.max_row}",
         ColorScaleRule(start_type='num', start_value=0, start_color='FF0000',
                        mid_type='num', mid_value=50, mid_color='FFFF00',
                        end_type='num', end_value=100, end_color='00FF00')
     )
     error_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
-    for col in ['C', 'D']:
-        ws.conditional_formatting.add(
-            f"{col}2:{col}{ws.max_row}",
-            CellIsRule(operator='equal', formula=['"ERROR"'], fill=error_fill)
-        )
+    ws.conditional_formatting.add(
+        f"C2:C{ws.max_row}", CellIsRule(operator='equal', formula=['"ERROR"'], fill=error_fill)
+    )
+    ws.conditional_formatting.add(
+        f"D2:D{ws.max_row}", CellIsRule(operator='equal', formula=['"ERROR"'], fill=error_fill)
+    )
     try:
         wb.save(EXCEL_FILE)
         return True
@@ -176,21 +170,59 @@ def write_excel(state):
         logger.exception(f"Failed to save Excel: {EXCEL_FILE}")
         return False
 
-# Main scan with GUI support
+# GUI and main flow
+def run_gui():
+    # Check ffmpeg
+    root = tk.Tk()
+    root.withdraw()
+    if not shutil.which('ffmpeg'):
+        messagebox.showwarning('FFmpeg Not Found',
+                               'FFmpeg was not found in PATH. For MP3/M4A support, please install FFmpeg.')
+    # Extension selection window
+    ext_win = tk.Toplevel()
+    ext_win.title('Select Formats')
+    tk.Label(ext_win, text='Check extensions to analyze:').pack(anchor='w', padx=10, pady=5)
+    var_dict = {}
+    for ext in SUPPORTED_EXTENSIONS:
+        var = tk.BooleanVar(value=True)
+        cb = tk.Checkbutton(ext_win, text=ext, variable=var)
+        cb.pack(anchor='w', padx=20)
+        var_dict[ext] = var
+    def on_ext_ok():
+        selected = [e for e, v in var_dict.items() if v.get()]
+        ext_win.destroy()
+        choose_folder_and_scan(selected)
+    tk.Button(ext_win, text='OK', command=on_ext_ok).pack(pady=10)
+    ext_win.protocol('WM_DELETE_WINDOW', sys.exit)
+    root.mainloop()
 
-def scan_and_update(folder):
+
+def choose_folder_and_scan(selected_exts):
+    folder = filedialog.askdirectory(title='Select audio folder')
+    if not folder:
+        messagebox.showinfo('Cancelled', 'No folder selected.')
+        sys.exit()
+    scan_and_update(folder, selected_exts)
+
+
+def scan_and_update(folder, selected_exts):
     state = load_state(STATE_FILE)
-    files = [os.path.join(dp, f) for dp, _, files in os.walk(folder) for f in files
-             if f.lower().endswith(SUPPORTED_EXTENSIONS)]
+    # gather files by selected extensions
+    files = [os.path.join(dp, f)
+             for dp, _, fs in os.walk(folder)
+             for f in fs
+             if os.path.splitext(f)[1].lower() in selected_exts]
     total = len(files)
     count = 0
     start_time = time.time()
-
-    # Build GUI
+    # build main window
     root = tk.Tk()
     root.title('Audio Analyzer')
-    status_label = tk.Label(root, text='Preparando...')
+    status_label = tk.Label(root, text='Preparing...')
     status_label.pack(pady=5)
+    # count/total label
+    count_label = tk.Label(root, text=f'0/{total}')
+    count_label.pack(pady=2)
     progress = ttk.Progressbar(root, length=400, maximum=total)
     progress.pack(pady=5)
     eta_label = tk.Label(root, text='ETA: 0s')
@@ -199,39 +231,30 @@ def scan_and_update(folder):
     def process_next():
         nonlocal count
         if count >= total:
-            # First, always save JSON state
             save_state(STATE_FILE, state)
-            # Then, attempt Excel generation
             try:
                 if write_excel(state):
                     messagebox.showinfo('Done', 'Analysis and report generated successfully.')
                 else:
-                    messagebox.showerror(
-                        'Error',
-                        'Failed to save Excel report. JSON state was saved; you can regenerate Excel later.'
-                    )
+                    messagebox.showerror('Error',
+                                         'Failed to save Excel report. JSON state was saved; you can regenerate Excel later.')
             except Exception:
-                # If any unexpected error occurs, JSON is already saved
                 logger.exception('Unexpected error during Excel generation')
-                messagebox.showerror(
-                    'Error',
-                    'An unexpected error occurred while generating the Excel. Your analysis data is safe in the JSON state.'
-                )
+                messagebox.showerror('Error',
+                                     'An unexpected error occurred while generating the Excel. Your analysis data is safe in the JSON state.')
             root.destroy()
-            return()
             return
-
         filepath = files[count]
         count += 1
-        status_label.config(text=f"Analisando: {os.path.basename(filepath)}")
+        # update UI
+        status_label.config(text=f"Analyzing: {os.path.basename(filepath)}")
+        count_label.config(text=f"{count}/{total}")
         progress['value'] = count
         elapsed = time.time() - start_time
-        avg = elapsed / count if count else 0
-        remaining = total - count
-        eta = int(avg * remaining)
+        eta = int((elapsed / count) * (total - count)) if count else 0
         eta_label.config(text=f"ETA: {eta}s")
-
-        # Analysis logic
+        root.update()
+        # analysis
         try:
             stat = os.stat(filepath)
             mtime, size = stat.st_mtime, stat.st_size
@@ -259,15 +282,10 @@ def scan_and_update(folder):
                 }
         except Exception:
             logger.exception(f"Error processing {filepath}")
-
         root.after(10, process_next)
 
     root.after(100, process_next)
     root.mainloop()
 
 if __name__ == '__main__':
-    folder = filedialog.askdirectory(title='Select audio folder')
-    if not folder:
-        messagebox.showinfo('Cancelled', 'No folder selected.')
-        sys.exit()
-    scan_and_update(folder)
+    run_gui()
