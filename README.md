@@ -13,13 +13,13 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
 ## 🎵 Features
 
 - Analyze **FLAC**, **AIFF**, **WAV**, **MP3**, and **M4A** files.
+- **Select which audio formats** to analyze.
 - Scans folders **recursively** (including subfolders).
 - **Avoids reprocessing** files already analyzed using a file **hash**.
+- **Reprocesses automatically** tracks that previously had errors.
 - **Detects** maximum reliable frequency, bitrate, sample rate, bit depth, and duration.
 - **Calculates a quality rating (0 to 100%)** based on technical parameters.
-- **Generates a formatted Excel file** (`audio_analysis.xlsx`) with:
-  - Conditional coloring: Green for high-quality tracks, Red for low-quality.
-  - Highlights errors automatically.
+- **Generates a formatted Excel file** (`audio_analysis.xlsx`)
 - **Logs** in `program.log` for easy review.
 
 ---
@@ -39,14 +39,16 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
 
 3. **Run the application**:
 
-   If your .py files are properly associated with Python, you can simply double-click on the script file (`analyze.py`) to run it. The program will execute and prompt you to select the folder for analysis.
+   If your .pyw files are properly associated with Python, you can simply double-click on the script file (`analyze.pyw`) to run it. The program will execute and prompt you to select the folder for analysis.
 
-    For more control or if you encounter any issues, you can also run the script via the command line:
+   For more control or if you encounter any issues, you can also run the script via the command line:
    ```bash
-   python analyze.py
+   python analyze.pyw
    ```
 
-4. **Select your music folder** when prompted.
+4. **Follow the application steps**:
+   - Select the audio formats you want to analyze using the format selection window.
+   - Choose the folder containing your tracks.
 
 5. **Check the results**:
    - `audio_analysis.xlsx` will be created/updated.
@@ -64,28 +66,31 @@ Without FFmpeg, **errors are guaranteed to occur** when processing some audio fi
 If you want to use FFmpeg with this tool, follow the instructions below:
 
 ### Windows:
+
 1. **Download FFmpeg**:
    - Visit [gyan.dev official website](https://www.gyan.dev/ffmpeg/builds/) and download the **ffmpeg-git-essentials.7z**.
    - Extract the archive and copy the `bin` folder to your project directory, i.e., `./ffmpeg/bin`.
-    - **Example folder structure**:
-```
-/audio-quality-checker
-├── analyze.py
-├── requirements.txt
-├── audio_analysis.xlsx
-├── program.log
-├── processed_state.json
-└── ffmpeg
-    └── bin
-        ├── ffmpeg.exe
-        ├── ffprop.exe
-        └── other-ffmpeg-files
-```
+
+   **Example folder structure**:
+   ```
+   /audio-quality-checker
+   ├── analyze.pyw
+   ├── requirements.txt
+   ├── audio_analysis.xlsx
+   ├── program.log
+   ├── processed_state.json
+   └── ffmpeg
+       └── bin
+           ├── ffmpeg.exe
+           ├── ffprobe.exe
+           └── other-ffmpeg-files
+   ```
 
 2. **Add FFmpeg to PATH (optional)**:
-   - You can also add the FFmpeg folder to your system's PATH environment variable for global usage. In this case the program will recognize ffmpeg automatically, and it will not be necessary to install the standalone version in the project root.
+   - You can also add the FFmpeg folder to your system's PATH environment variable for global usage. In this case the program will recognize FFmpeg automatically, and it will not be necessary to install the standalone version in the project root.
 
 ### Linux:
+
 1. **Install FFmpeg**:
    - On **Ubuntu/Debian** systems:
      ```bash
@@ -113,7 +118,7 @@ Once FFmpeg is installed or included, the tool will automatically use it for bet
 
 - **audio_analysis.xlsx**: Detailed report.
 - **program.log**: Log file with errors and other data.
-- **processed_state.json**: Internal tracking to skip already analyzed files.
+- **processed_state.json**: Internal file.
 
 ---
 
@@ -132,6 +137,7 @@ Once FFmpeg is installed or included, the tool will automatically use it for bet
 ## 📈 Rating System
 
 The quality rating (0 to 100%) is calculated based on:
+
 - Maximum reliable frequency detected.
 - Bitrate of the file.
 - Sampling rate.
@@ -145,57 +151,7 @@ The rating is calculated based on technical parameters like frequency, bitrate, 
 
   - Below 80%: These tracks might have lower quality and may not sound as good on high-end audio systems. They might be acceptable for casual settings but are not recommended for professional performances.
 
-Note: These are just guidelines. Audio quality can be subjective depending on the equipment used and the specific needs of the event. Use your discretion when selecting tracks for a performance.
-
----
-
-## ☝️🤓 How to Customize the Output
-
-Inside `analyze.py`, you can configure these parameters to fit your needs:
-
-### Configurable Parameters
-
-```python
-THRESH_DB = -60
-```
-- Threshold in decibels. Frequencies below this value are considered too weak to be meaningful.
-
-```python
-PROPORTION_THRESHOLD = 0.05
-```
-- Minimum proportion (5%) of the track that must exhibit energy at a frequency to consider it valid.
-
-```python
-N_FFT = 4096
-```
-- Size of the window used in the FFT (Fast Fourier Transform). Larger values provide higher frequency resolution but slower processing.
-
-```python
-STATE_FILE = 'processed_state.json'
-```
-- Name of the file that keeps track of which tracks have already been analyzed to avoid redundant work.
-
-```python
-EXCEL_FILE = 'audio_analysis.xlsx'
-```
-- Name of the generated Excel file containing the analysis results.
-
-```python
-LOG_FILE = 'program.log'
-```
-- Name of the file where the logs generated during analysis will be recorded.
-
-```python
-WEIGHTS = {
-    'freq': 40,
-    'bitrate': 30,
-    'samplerate': 20,
-    'bitdepth': 10
-}
-```
-- Defines how much each factor (frequency, bitrate, sample rate, bit depth) contributes to the overall quality rating.
-
-You can adjust thresholds, file types, and how much each factor impacts the quality rating depending on your event requirements.
+**Note**: These are just guidelines. Audio quality can be subjective depending on the equipment used and the specific needs of the event. Use your discretion when selecting tracks for a performance.
 
 ---
 
@@ -203,7 +159,9 @@ You can adjust thresholds, file types, and how much each factor impacts the qual
 
 This project is licensed under the **MIT License** — feel free to use, share, and modify.
 
-# 🔥 Notes
+---
+
+## 🔥 Notes
 
 - Only **new or changed** tracks are processed — saving time for large collections.
 - Very useful for DJs ensuring **audio quality control** before gigs.
