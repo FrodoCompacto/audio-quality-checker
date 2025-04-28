@@ -5,7 +5,7 @@ import hashlib
 import librosa
 import numpy as np
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from datetime import datetime
 from mutagen import File as MutagenFile
 from openpyxl import Workbook
@@ -14,6 +14,7 @@ from openpyxl.formatting.rule import ColorScaleRule, CellIsRule
 import logging
 import traceback
 import shutil
+import time
 
 # Attempt to include local FFmpeg (portable standalone) if present
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -41,13 +42,15 @@ WEIGHTS = {
     'bitdepth': 10
 }
 
-# Setup logging (only errors)
+# Setup logging
 logging.basicConfig(
     filename=LOG_FILE,
     level=logging.ERROR,
     format='%(asctime)s %(levelname)s: %(message)s'
 )
 logger = logging.getLogger()
+
+# Utility functions
 
 def load_state(path):
     if os.path.exists(path):
@@ -63,6 +66,7 @@ def save_state(path, state):
     try:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(state, f, indent=2, ensure_ascii=False)
+        logger.info(f"State saved to {path}")
     except Exception:
         logger.exception(f"Error saving state to {path}")
 
@@ -118,6 +122,15 @@ def compute_rating(freq, sr, bitrate, bitdepth):
     normalized = (raw / active_weights) * 100
     return round(normalized, 1)
 
+def needs_reanalysis(entry):
+    if not entry:
+        return True
+    if any(str(entry.get(k)) in ("ERROR", "N/A", "None") for k in ['freq', 'duration', 'bitrate', 'samplerate']):
+        return True
+    return False
+
+# Excel writer
+
 def write_excel(state):
     wb = Workbook()
     ws = wb.active
@@ -125,7 +138,6 @@ def write_excel(state):
     headers = ['file_name', 'file_size_bytes', 'duration_s', 'max_freq_hz',
                'bitrate', 'samplerate', 'bitdepth', 'rating']
     ws.append(headers)
-
     for e in state.values():
         filename = os.path.basename(e['path'])
         ws.append([
@@ -138,14 +150,12 @@ def write_excel(state):
             e['bitdepth'],
             e['rating']
         ])
-
     for cell in ws[1]:
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal='center')
     for col in ws.columns:
         length = max(len(str(c.value)) for c in col)
         ws.column_dimensions[col[0].column_letter].width = length + 2
-
     rating_col = 'H'
     ws.conditional_formatting.add(
         f"{rating_col}2:{rating_col}{ws.max_row}",
@@ -153,14 +163,12 @@ def write_excel(state):
                        mid_type='num', mid_value=50, mid_color='FFFF00',
                        end_type='num', end_value=100, end_color='00FF00')
     )
-
     error_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
     for col in ['C', 'D']:
         ws.conditional_formatting.add(
             f"{col}2:{col}{ws.max_row}",
             CellIsRule(operator='equal', formula=['"ERROR"'], fill=error_fill)
         )
-
     try:
         wb.save(EXCEL_FILE)
         return True
@@ -168,88 +176,98 @@ def write_excel(state):
         logger.exception(f"Failed to save Excel: {EXCEL_FILE}")
         return False
 
-def needs_reanalysis(entry):
-    if not entry:
-        return True
-    if any(str(entry.get(k)) in ("ERROR", "N/A", "None") for k in ['freq', 'duration', 'bitrate', 'samplerate']):
-        return True
-    return False
+# Main scan with GUI support
 
-def scan_and_update(root_dir):
+def scan_and_update(folder):
     state = load_state(STATE_FILE)
-    updated = False
-
-    files = [os.path.join(dp, f) for dp, _, files in os.walk(root_dir) for f in files
+    files = [os.path.join(dp, f) for dp, _, files in os.walk(folder) for f in files
              if f.lower().endswith(SUPPORTED_EXTENSIONS)]
     total = len(files)
     count = 0
+    start_time = time.time()
 
-    for filepath in files:
+    # Build GUI
+    root = tk.Tk()
+    root.title('Audio Analyzer')
+    status_label = tk.Label(root, text='Preparando...')
+    status_label.pack(pady=5)
+    progress = ttk.Progressbar(root, length=400, maximum=total)
+    progress.pack(pady=5)
+    eta_label = tk.Label(root, text='ETA: 0s')
+    eta_label.pack(pady=5)
+
+    def process_next():
+        nonlocal count
+        if count >= total:
+            # First, always save JSON state
+            save_state(STATE_FILE, state)
+            # Then, attempt Excel generation
+            try:
+                if write_excel(state):
+                    messagebox.showinfo('Done', 'Analysis and report generated successfully.')
+                else:
+                    messagebox.showerror(
+                        'Error',
+                        'Failed to save Excel report. JSON state was saved; you can regenerate Excel later.'
+                    )
+            except Exception:
+                # If any unexpected error occurs, JSON is already saved
+                logger.exception('Unexpected error during Excel generation')
+                messagebox.showerror(
+                    'Error',
+                    'An unexpected error occurred while generating the Excel. Your analysis data is safe in the JSON state.'
+                )
+            root.destroy()
+            return()
+            return
+
+        filepath = files[count]
         count += 1
+        status_label.config(text=f"Analisando: {os.path.basename(filepath)}")
+        progress['value'] = count
+        elapsed = time.time() - start_time
+        avg = elapsed / count if count else 0
+        remaining = total - count
+        eta = int(avg * remaining)
+        eta_label.config(text=f"ETA: {eta}s")
+
+        # Analysis logic
         try:
             stat = os.stat(filepath)
+            mtime, size = stat.st_mtime, stat.st_size
+            h = file_hash(filepath)
+            entry = state.get(h)
+            if not (entry and entry.get('mtime') == mtime and entry.get('size') == size and not needs_reanalysis(entry)):
+                freq, sr = max_reliable_frequency(filepath)
+                bitrate, samplerate_meta, bitdepth = extract_metadata(filepath)
+                try:
+                    duration = librosa.get_duration(filename=filepath)
+                except Exception:
+                    logger.exception(f"Duration error for {filepath}")
+                    duration = 'ERROR'
+                rating = compute_rating(freq or 0, sr or 0, bitrate, bitdepth)
+                state[h] = {
+                    'path': filepath,
+                    'mtime': mtime,
+                    'size': size,
+                    'duration': duration,
+                    'freq': freq if freq is not None else 'ERROR',
+                    'bitrate': bitrate or 'N/A',
+                    'samplerate': samplerate_meta or 'N/A',
+                    'bitdepth': bitdepth or 'N/A',
+                    'rating': rating
+                }
         except Exception:
-            logger.exception(f"Access error for {filepath}")
-            print(f"[{count}/{total}] Access error: {filepath}")
-            continue
+            logger.exception(f"Error processing {filepath}")
 
-        h = file_hash(filepath)
-        if not h:
-            print(f"[{count}/{total}] Hash error: {filepath}")
-            continue
+        root.after(10, process_next)
 
-        mtime, size = stat.st_mtime, stat.st_size
-        entry = state.get(h)
+    root.after(100, process_next)
+    root.mainloop()
 
-        if entry and entry.get('mtime') == mtime and entry.get('size') == size and not needs_reanalysis(entry):
-            print(f"[{count}/{total}] Already analyzed: {filepath}")
-            continue
-
-        freq, sr = max_reliable_frequency(filepath)
-        bitrate, samplerate_meta, bitdepth = extract_metadata(filepath)
-        try:
-            duration = librosa.get_duration(filename=filepath)
-        except Exception:
-            logger.exception(f"Duration error for {filepath}")
-            duration = 'ERROR'
-
-        rating = compute_rating(freq or 0, sr or 0, bitrate, bitdepth)
-        state[h] = {
-            'path': filepath,
-            'mtime': mtime,
-            'size': size,
-            'duration': duration,
-            'freq': freq if freq is not None else 'ERROR',
-            'bitrate': bitrate or 'N/A',
-            'samplerate': samplerate_meta or 'N/A',
-            'bitdepth': bitdepth or 'N/A',
-            'rating': rating
-        }
-        updated = True
-        print(f"[{count}/{total}] Analyzed: {filepath} → {freq or 'ERROR'} Hz, Rating: {rating}%")
-
-    if updated:
-        if write_excel(state):
-            save_state(STATE_FILE, state)
-            messagebox.showinfo('Done', 'Analysis and report generated successfully.')
-        else:
-            messagebox.showerror(
-                'Error',
-                'Failed to save Excel report. Please close any open instances of the file and try again.\n'
-                'Check the log file for details.'
-            )
-    else:
-        print("No new or updated tracks found.")
-        messagebox.showinfo('Info', 'No new or updated tracks found.')
-
-def select_folder_and_run():
-    root = tk.Tk()
-    root.withdraw()
+if __name__ == '__main__':
     folder = filedialog.askdirectory(title='Select audio folder')
     if not folder:
         messagebox.showinfo('Cancelled', 'No folder selected.')
-        return
+        sys.exit()
     scan_and_update(folder)
-
-if __name__ == '__main__':
-    select_folder_and_run()
