@@ -102,11 +102,19 @@ Once FFmpeg is available, the tool auto-detects and leverages it for improved au
 
 ## 📈 Rating System
 
-The quality rating (0–100%) is based on:
+The quality rating (0 to 100%) is calculated based on:
 - Maximum reliable frequency detected.
-- Bitrate.
+- Bitrate of the file.
 - Sampling rate.
 - Bit depth (if available).
+
+The rating is calculated based on technical parameters like frequency, bitrate, sample rate, and bit depth. Here's how you can interpret the results:
+
+  - 80% or higher: The track is generally good enough for professional events and DJ performances. This rating indicates the track has a high enough quality for most shows and is suitable for high-quality sound systems.
+
+  - 90% or higher: The track is considered excellent quality and would be perfect for events that require the best possible sound, such as large-scale concerts or professional DJ sets.
+
+  - Below 80%: These tracks might have lower quality and may not sound as good on high-end audio systems. They might be acceptable for casual settings but are not recommended for professional performances.
 
 Note: These are just guidelines. Audio quality can be subjective depending on the equipment used and the specific needs of the event. Use your discretion when selecting tracks for a performance.
 
