@@ -230,7 +230,7 @@ class AnalyzerApp:
         h=file_hash(filepath); entry=state.get(h)
         if entry and entry['mtime']==mtime and entry['size']==size and not needs_reanalysis(entry): return entry
         freq,sr=max_reliable_frequency(filepath); br,sr_meta,bd=extract_metadata(filepath)
-        try: duration=librosa.get_duration(path=filepath)
+        try: duration=int(librosa.get_duration(path=filepath))
         except: duration='ERROR'
         rating=compute_rating(freq or 0,sr or 0,br,bd)
         entry={'path':filepath,'size':size,'mtime':mtime,'duration':duration,'freq':freq or 0,'bitrate':br or 'N/A','samplerate':sr_meta or 'N/A','bitdepth':bd or 'N/A','rating':rating}
