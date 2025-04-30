@@ -124,25 +124,81 @@ def write_excel(state):
         wb = Workbook()
         ws = wb.active
         ws.title = 'Audio Report'
-        headers = ['file_name', 'file_size_bytes', 'duration_s', 'max_freq_hz', 'bitrate', 'samplerate', 'bitdepth', 'rating']
+
+        headers = [
+            'file_name', 'file_size_bytes', 'duration_s',
+            'max_freq_hz', 'bitrate', 'samplerate',
+            'bitdepth', 'rating'
+        ]
         ws.append(headers)
+
         for e in state.values():
-            ws.append([os.path.basename(e['path']), e['size'], e['duration'], e['freq'], e['bitrate'], e['samplerate'], e['bitdepth'], e['rating']])
+            ws.append([
+                os.path.basename(e['path']),
+                e['size'],
+                e['duration'],
+                e['freq'],
+                e['bitrate'],
+                e['samplerate'],
+                e['bitdepth'],
+                e['rating']
+            ])
+
         for cell in ws[1]:
             cell.font = Font(bold=True)
             cell.alignment = Alignment(horizontal='center')
+
         for col in ws.columns:
             max_len = max(len(str(c.value)) for c in col)
             ws.column_dimensions[col[0].column_letter].width = max_len + 2
-        ws.conditional_formatting.add(
-            f'H2:H{ws.max_row}',
-            ColorScaleRule(start_type='num', start_value=0, start_color='FF0000', mid_type='num', mid_value=50, mid_color='FFFF00', end_type='num', end_value=100, end_color='00FF00')
+
+        rating_range = f"H2:H{ws.max_row}"
+
+        low_rule = CellIsRule(
+            operator='lessThan',
+            formula=['50'],
+            stopIfTrue=True,
+            fill=PatternFill(start_color='FF0000', end_color='FF0000', fill_type='solid')
         )
-        fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
-        ws.conditional_formatting.add(f'C2:C{ws.max_row}', CellIsRule(operator='equal', formula=['"ERROR"'], fill=fill))
-        ws.conditional_formatting.add(f'D2:D{ws.max_row}', CellIsRule(operator='equal', formula=['"ERROR"'], fill=fill))
+        ws.conditional_formatting.add(rating_range, low_rule)
+
+        mid_rule = CellIsRule(
+            operator='between',
+            formula=['50', '79'],
+            stopIfTrue=True,
+            fill=PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
+        )
+        ws.conditional_formatting.add(rating_range, mid_rule)
+
+        good_rule = CellIsRule(
+            operator='between',
+            formula=['80', '89'],
+            stopIfTrue=True,
+            fill=PatternFill(start_color='66CC66', end_color='66CC66', fill_type='solid')
+        )
+        ws.conditional_formatting.add(rating_range, good_rule)
+
+        high_rule = CellIsRule(
+            operator='greaterThanOrEqual',
+            formula=['90'],
+            stopIfTrue=True,
+            fill=PatternFill(start_color='00FF00', end_color='00FF00', fill_type='solid')
+        )
+        ws.conditional_formatting.add(rating_range, high_rule)
+
+        error_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
+        ws.conditional_formatting.add(
+            f"C2:C{ws.max_row}",
+            CellIsRule(operator='equal', formula=['\"ERROR\"'], fill=error_fill)
+        )
+        ws.conditional_formatting.add(
+            f"D2:D{ws.max_row}",
+            CellIsRule(operator='equal', formula=['\"ERROR\"'], fill=error_fill)
+        )
+
         wb.save(EXCEL_FILE)
         return True
+
     except Exception:
         logger.exception(f"Excel save error: {EXCEL_FILE}")
         return False
