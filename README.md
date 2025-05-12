@@ -8,7 +8,7 @@
 
 Analyze and validate the quality of your audio files in bulk, ensuring your music is ready for professional DJ performances.
 
-> **Novidade!** 🎉 Um executável para Windows está disponível na seção [Releases](https://github.com/FrodoCompacto/audio-quality-checker/releases). Basta baixar e clicar duas vezes para executar - sem necessidade de instalar Python ou dependências! O programa foi testado e funciona perfeitamente no Windows 10/11.
+> **New!** 🎉 A Windows executable is now available in the [Releases](https://github.com/FrodoCompacto/audio-quality-checker/releases) section. Just download and double-click to run - no need to install Python or dependencies! The program has been tested and works perfectly on Windows 10/11.
 
 ---
 
@@ -28,19 +28,19 @@ Analyze and validate the quality of your audio files in bulk, ensuring your musi
 
 ## 🚀 How to Use
 
-### Método 1: Usando o Executável (Recomendado para Windows)
+### Method 1: Using the Executable (Recommended for Windows)
 
-1. **Baixe o executável**:
-   - Vá para a seção [Releases](https://github.com/FrodoCompacto/audio-quality-checker/releases)
-   - Baixe o arquivo `analyze.exe` mais recente
-   - Coloque o arquivo em qualquer pasta do seu computador
+1. **Download the executable**:
+   - Go to the [Releases](https://github.com/FrodoCompacto/audio-quality-checker/releases) section
+   - Download the latest `analyze.exe` file
+   - Place the file in any folder on your computer
 
-2. **Execute o programa**:
-   - Dê duplo clique no arquivo `analyze.exe`
-   - O programa abrirá automaticamente
-   - Não é necessário instalar Python ou qualquer dependência
+2. **Run the program**:
+   - Double-click the `analyze.exe` file
+   - The program will open automatically
+   - No need to install Python or any dependencies
 
-### Método 2: Usando o Código Fonte
+### Method 2: Using the Source Code
 
 1. **Clone the repository**:
    ```bash
